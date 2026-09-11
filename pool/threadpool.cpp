@@ -2,7 +2,8 @@
 
 ThreadPool::ThreadPool(size_t numThreads) : m_stop(false) {
     for (size_t i = 0; i < numThreads; ++i) {
-        m_workers.emplace_back([this] { worker(); });
+        m_workers.emplace_back([this] { worker(); }); 
+        //因为 worker 是成员函数，不是普通函数。在 C++ 里，成员函数不能像普通函数那样直接使用
     }
 }
 

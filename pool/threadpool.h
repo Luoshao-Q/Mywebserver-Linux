@@ -22,11 +22,11 @@ public:
 private:
     void worker();
 
-    std::vector<std::thread> m_workers;
-    std::queue<std::function<void()>> m_tasks;
-    std::mutex m_mutex;
-    std::condition_variable m_cv;
-    std::atomic<bool> m_stop;
+    std::vector<std::thread> m_workers;  // 工作线程池
+    std::queue<std::function<void()>> m_tasks;  // 任务队列
+    std::mutex m_mutex;  // 保护任务队列的锁
+    std::condition_variable m_cv;  // 线程等待/唤醒条件变量
+    std::atomic<bool> m_stop;  // 停止标志（原子操作，线程安全）
 };
 
 template<typename F, typename... Args>
@@ -38,7 +38,7 @@ void ThreadPool::enqueue(F&& f, Args&&... args) {
 
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        if (m_stop) return;
+        if (m_stop) return;  //是为了防止“线程池正在销毁时，还有人往里面塞任务”。
         m_tasks.push(std::move(wrapped));
     }
     m_cv.notify_one();

@@ -156,24 +156,47 @@ void WebServer::acceptConnections() {
 }
 
 void WebServer::handleClient(int clientFd) {
-    char buffer[4096] = {0};
-    int n = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
-    if (n <= 0) {
-        return;
+    std::string fullRequest;
+    fullRequest.reserve(4096);  // 预分配，减少扩容
+    char buffer[4096];
+    const size_t MAX_REQUEST_SIZE = 1024 * 1024;  // 1MB 上限
+    
+    while (true) {
+        int n = recv(clientFd, buffer, sizeof(buffer), 0);
+        if (n > 0) {
+            //按长度追加，不依赖 '\0'
+            fullRequest.append(buffer, n);
+            
+            // 防止恶意客户端无限发数据
+            if (fullRequest.size() > MAX_REQUEST_SIZE) {
+                logMessage("请求过大，fd=" + std::to_string(clientFd), LOG_WARNING);
+                // 可以返回 413 Payload Too Large，这里简单断开
+                return;
+            }
+        } else if (n == 0) {
+            return;  // 客户端关闭连接
+        } else {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                break;  // 数据读完了
+            } else {
+                logMessage("recv 失败，fd=" + std::to_string(clientFd), LOG_ERROR);
+                return;
+            }
+        }
     }
-
-    // 解析 HTTP 请求
+    
+    if (fullRequest.empty()) {
+        return;  // 没读到数据，直接退出
+    }
+    
     HttpRequest req;
-    if (!req.parse(std::string(buffer, n))) {
-        return;
+    if (!req.parse(fullRequest)) {
+        return;  // 解析失败，退出
     }
-
+    
     logMessage("Request: " + req.method + " " + req.path);
-
-    // 构造响应
     HttpResponse resp = HttpResponse::fromFile(req.path, m_rootDir);
     std::string response = resp.build();
-
     send(clientFd, response.c_str(), response.size(), 0);
     
     logMessage("Response: " + std::to_string(resp.statusCode) + " for " + req.path,

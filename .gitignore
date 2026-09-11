@@ -1,0 +1,15 @@
+# 编译产物
+*.o
+/server
+
+# 日志文件
+log/*.log
+
+# VS Code 配置
+.vscode/
+
+# Windows 系统文件
+*.Zone.Identifier
+
+# 编辑器临时文件
+*.swp
